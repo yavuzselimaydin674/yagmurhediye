@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Yavuz & Yağmur: Sonsuz Aşk</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; cursor: pointer; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; }
+        #dialog { 
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.95); color: white; padding: 25px; border: 3px solid #ff4757;
+            display: none; width: 80%; max-width: 650px; text-align: center; border-radius: 15px;
+            font-size: 24px; box-shadow: 0 0 30px rgba(255, 71, 87, 0.6); z-index: 20;
+        }
+        #final-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center;
+            flex-direction: column; color: white; text-align: center; z-index: 30;
+            background-size: cover; background-position: center; background-color: #000;
+        }
+        .final-text-box { background: rgba(0, 0, 0, 0.7); padding: 30px; border-radius: 20px; border: 2px solid #ff4757; max-width: 800px; }
+        #start-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; text-align: center; z-index: 100; background: rgba(255, 71, 87, 0.8); padding: 15px; border-radius: 10px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body onclick="startEverything()">
+    <!-- Müzik elementine 'loop' ekledim, bittiğinde başa sarar -->
+    <audio id="gameMusic" loop><source src="muzik.mp3" type="audio/mpeg"></audio>
+    
+    <div id="start-hint">Müziği Başlatmak ve Oynamak İçin Ekrana Tıkla!</div>
+
+    <div id="ui">Can: <span id="health">100</span> | Ortalama: <span id="gpa">1.00</span></div>
+    <div id="dialog"></div>
+    
+    <div id="final-screen">
+        <div class="final-text-box">
+            <h1 style="font-size: 50px; text-shadow: 0 0 15px #ff4757; margin-bottom: 20px;">6. AYIMIZ KUTLU OLSUN!</h1>
+            <p id="final-p" style="font-size: 26px; line-height: 1.5;"></p>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const dialogBox = document.getElementById('dialog');
+        const finalScreen = document.getElementById('final-screen');
+        const music = document.getElementById('gameMusic');
+        const startHint = document.getElementById('start-hint');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Tarayıcı kuralı gereği müzik için etkileşim şart
+        function startEverything() {
+            if(music.paused) {
+                music.play();
+                startHint.style.display = 'none';
+            }
+        }
+
+        const imgArkaPlan = new Image(); imgArkaPlan.src = 'arkaplan.jpg';
+        const imgYavuz = new Image(); imgYavuz.src = 'yavuz.png';
+        const imgYagmur = new Image(); imgYagmur.src = 'yagmur.png';
+        const imgCanavar = new Image(); imgCanavar.src = 'canavar.png';
+        const imgKilic = new Image(); imgKilic.src = 'kilic.png';
+        const imgKitap = new Image(); imgKitap.src = 'kitap.png';
+        const imgEfekt = new Image(); imgEfekt.src = 'kitapefekti.png';
+        const imgFinal = new Image(); imgFinal.src = 'final.jpg';
+
+        const groundY = canvas.height - 100;
+        const yavuzSize = 250, yagmurSize = 130, canavarSize = 170;
+        const yavuzYOffset = 85, yagmurYOffset = 15; 
+
+        let stage = 1, gpa = 1.00, health = 100, keys = {}, enemies = [], books = [], activeEffects = [];
+        let boss = { x: -300, y: groundY - canavarSize + 10, width: canavarSize, height: canavarSize, hp: 100, active: false };
+        const player = { x: 50, y: groundY - yavuzSize + yavuzYOffset, width: yavuzSize, height: yavuzSize, speed: 8, direction: 1, attacking: false, attackTimer: 0 };
+        const partner = { x: canvas.width - 250, y: groundY - yagmurSize + yagmurYOffset, width: yagmurSize, height: yagmurSize };
+
+        function spawnEnemy() {
+            if ((stage === 1 || stage === 3) && health > 0) {
+                enemies.push({ x: canvas.width, y: groundY - 120, width: 120, height: 120, speed: 5 });
+            }
+        }
+        setInterval(spawnEnemy, 2000);
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (imgArkaPlan.complete) ctx.drawImage(imgArkaPlan, 0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#1e2227'; ctx.fillRect(0, groundY, canvas.width, 100);
+            ctx.strokeStyle = '#34495e';
+            for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i, groundY); ctx.lineTo(i-20, canvas.height); ctx.stroke(); }
+
+            ctx.save();
+            if (player.direction === -1) {
+                ctx.translate(player.x + player.width, player.y); ctx.scale(-1, 1);
+                ctx.drawImage(imgYavuz, 0, 0, player.width, player.height);
+            } else { ctx.drawImage(imgYavuz, player.x, player.y, player.width, player.height); }
+            ctx.restore();
+
+            if (stage >= 3) { partner.x = player.x - 100; partner.y = groundY - yagmurSize + yagmurYOffset; }
+            else {
+                ctx.fillStyle = '#555';
+                for(let i = -5; i <= partner.width + 5; i += 30) { ctx.fillRect(partner.x + i, partner.y - 10, 10, partner.height + 10); }
+            }
+            ctx.drawImage(imgYagmur, partner.x, partner.y, partner.width, partner.height);
+
+            if (boss.active) {
+                if (stage >= 6) boss.x = canvas.width - 200; 
+                ctx.drawImage(imgCanavar, boss.x, boss.y, boss.width, boss.height);
+                if(boss.hp > 0 && stage < 6) { ctx.fillStyle = "red"; ctx.fillRect(boss.x, boss.y - 20, (boss.hp/100)*boss.width, 10); }
+            }
+
+            enemies.forEach((enemy, index) => {
+                enemy.x -= enemy.speed; ctx.drawImage(imgCanavar, enemy.x, enemy.y, enemy.width, enemy.height);
+                if (player.attacking && Math.abs(player.x + player.width/2 - (enemy.x + enemy.width/2)) < 220) enemies.splice(index, 1);
+                if (Math.abs(player.x - enemy.x) < 50 && stage < 6) { health -= 0.05; document.getElementById('health').innerText = Math.floor(health); }
+            });
+
+            if (stage === 6) {
+                if (Math.random() < 0.03) books.push({x: Math.random()*(canvas.width - 300), y: -50});
+                books.forEach((b, i) => {
+                    b.y += 5; ctx.drawImage(imgKitap, b.x, b.y, 60, 60);
+                    if(Math.abs(player.x + 50 - b.x) < 50 && Math.abs(player.y + 100 - b.y) < 80) {
+                        activeEffects.push({x: b.x, y: b.y, timer: 15});
+                        books.splice(i, 1); gpa += 0.10;
+                        document.getElementById('gpa').innerText = gpa.toFixed(2);
+                        if(gpa >= 4.00) startFinalVictoryDialogue();
+                    }
+                });
+            }
+
+            activeEffects.forEach((ef, i) => {
+                ctx.drawImage(imgEfekt, ef.x - 20, ef.y - 20, 100, 100);
+                ef.timer--; if(ef.timer <= 0) activeEffects.splice(i, 1);
+            });
+
+            if (player.attacking && stage < 6) {
+                let progress = 1 - (player.attackTimer / 15);
+                ctx.save();
+                if (player.direction === 1) {
+                    ctx.translate(player.x + player.width - 50, player.y + 110);
+                    ctx.rotate((-45 + (135 * progress)) * Math.PI / 180);
+                    ctx.drawImage(imgKilic, 0, -130, 240, 120);
+                }
+                ctx.restore();
+                player.attackTimer--; if (player.attackTimer <= 0) player.attacking = false;
+            }
+
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        function update() {
+            if ([2, 4, 10, 11].includes(stage)) return;
+            if (keys['ArrowRight']) { player.x += player.speed; player.direction = 1; }
+            if (keys['ArrowLeft']) { player.x -= player.speed; player.direction = -1; }
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - 150) player.x = canvas.width - 150;
+            
+            if (stage === 1 && player.x + player.width > partner.x - 30) startDialogue();
+            if (stage === 3 && player.x > canvas.width - 350) startBossEvent();
+            if (stage === 5 && boss.hp <= 5) startBossDeathTalk();
+            if (stage === 5 && player.attacking && Math.abs(player.x - boss.x) < 250) { boss.hp -= 2.5; }
+        }
+
+        function startDialogue() {
+            stage = 2; dialogBox.style.display = "block";
+            let step = 0;
+            const texts = ["<b>YAVUZ:</b> Yavrum! Korkma, beraberiz!", "<b>YAĞMUR:</b> Geleceğini biliyordum sevgilim...", "<b>YAVUZ:</b> Gel şu Canavar Evren'e hakkını verelim!", "<b>YAĞMUR:</b> Arkandayım!"];
+            dialogBox.innerHTML = texts[0] + "<br><small>(Boşluk'a bas)</small>";
+            const next = (e) => { if (e.key === " ") { step++; if (step < texts.length) dialogBox.innerHTML = texts[step]; else { stage = 3; dialogBox.style.display = "none"; window.removeEventListener('keydown', next); }}};
+            window.addEventListener('keydown', next);
+        }
+
+        function startBossEvent() {
+            stage = 4; boss.active = true; boss.x = canvas.width - 350; player.x = 200;
+            dialogBox.style.display = "block";
+            let step = 0;
+            const texts = ["<b>CANAVAR EVREN:</b> İlişkinizi bozmaya geldim! Ayıracağım sizi!", "<b>YAVUZ:</b> Ancak ölüm bozabilir! 6. ayımızdayız biz!"];
+            dialogBox.innerHTML = texts[0];
+            const next = (e) => { if (e.key === " ") { step++; if (step < texts.length) dialogBox.innerHTML = texts[step]; else { stage = 5; dialogBox.style.display = "none"; window.removeEventListener('keydown', next); }}};
+            window.addEventListener('keydown', next);
+        }
+
+        function startBossDeathTalk() {
+            stage = 10; boss.hp = 0; boss.active = true; dialogBox.style.display = "block";
+            let step = 0;
+            const texts = ["<b>CANAVAR EVREN:</b> Yenge... Kızlar bekliyor...", "<b>CANAVAR EVREN:</b> Şakaydı yenge, vurma artık...", "<b>CANAVAR EVREN:</b> Aaaaaah NEHİİİİİR!", "<b>YAĞMUR:</b> Sonunda bitti... Ama vizeler yaklaşıyor!", "<b>YAVUZ:</b> Korkma, kitapları toplayıp ortalamayı 4.00 yapalım!"];
+            dialogBox.innerHTML = texts[0];
+            const next = (e) => { if (e.key === " ") { step++; if (step < texts.length) dialogBox.innerHTML = texts[step]; else { stage = 6; dialogBox.style.display = "none"; window.removeEventListener('keydown', next); }}};
+            window.addEventListener('keydown', next);
+        }
+
+        function startFinalVictoryDialogue() {
+            stage = 11; keys = {}; dialogBox.style.display = "block";
+            let step = 0;
+            const texts = [
+                "<b>YAĞMUR:</b> Hem canavar öldü hem de ortalamam 4 oldu!",
+                "<b>CANAVAR EVREN (Sayıklama):</b> Aaah hem Yavuz kızların yanına gelmiyor hem de ortalamaları 4 oldu... Aaah öldüüüüm!"
+            ];
+            dialogBox.innerHTML = texts[0];
+            const next = (e) => { if (e.key === " ") { step++; 
+                if (step < texts.length) dialogBox.innerHTML = texts[step]; 
+                else { 
+                    boss.active = false; stage = 7; dialogBox.style.display = "none"; 
+                    canvas.style.display = "none"; document.getElementById('ui').style.display = "none";
+                    finalScreen.style.backgroundImage = "url('final.jpg')";
+                    document.getElementById('final-p').innerText = "Yavrum ortalamanı 4 yaptık canavar evreni de yendik 6. ayımızın 6. yılımıza kadar uzanması dileğiyle seni çok seviyorum";
+                    finalScreen.style.display = "flex"; 
+                    window.removeEventListener('keydown', next); 
+                }
+            }};
+            window.addEventListener('keydown', next);
+        }
+
+        window.addEventListener('keydown', (e) => { keys[e.key] = true; if (e.key === " " && ![2, 4, 10, 11].includes(stage)) { player.attacking = true; player.attackTimer = 15; } });
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+        draw();
+    </script>
+</body>
+</html>
